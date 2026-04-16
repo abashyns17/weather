@@ -148,6 +148,9 @@ class CurrentTemperatureResponse(BaseModel):
     upstream_url: str
     timestamp: str
     temperature_c: float
+    humidity_pct: Optional[int] = None
+    elevation_m: Optional[float] = None
+    barometric_pressure_inhg: Optional[float] = None
     interval_seconds: Optional[int] = None
 
 
@@ -433,13 +436,114 @@ async def fetch_temperature_series(config: AppConfig) -> TemperatureSeriesRespon
     )
 
 
+# ─── Humidity models ──────────────────────────────────────────────────────────
+
+class HumidityReading(BaseModel):
+    timestamp: str
+    humidity_pct: int
+
+
+class HumiditySeriesResponse(BaseModel):
+    source: str = "open-meteo"
+    granularity: Literal["daily"] = "daily"
+    start_date: date
+    end_date: date
+    resolved_location: LocationResolution
+    upstream_url: str
+    readings: list[HumidityReading]
+
+
+# ─── Humidity archive fetch ───────────────────────────────────────────────────
+# Mirrors fetch_archive_bucket but requests relative_humidity_2m_mean.
+# Intentionally separate — the temperature projection path is not touched.
+
+async def fetch_humidity_archive_bucket(
+    *,
+    client: httpx.AsyncClient,
+    latitude: float,
+    longitude: float,
+    start_date: date,
+    end_date: date,
+    timezone: str,
+) -> tuple[str, list[str], list[int]]:
+    params: dict[str, str | float] = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "daily": "relative_humidity_2m_mean",
+        "timezone": timezone,
+    }
+
+    upstream_url = f"{OPEN_METEO_ARCHIVE_URL}?{urlencode(params)}"
+    payload = await get_json_with_backoff(
+        client=client,
+        url=OPEN_METEO_ARCHIVE_URL,
+        params=params,
+        cache_prefix="archive_humidity_daily",
+        timeout_error_label="Open-Meteo humidity archive request",
+    )
+
+    bucket = payload.get("daily")
+    if not bucket:
+        raise HTTPException(
+            status_code=502,
+            detail="Unexpected Open-Meteo response: missing 'daily' bucket in humidity archive",
+        )
+
+    times: list[str] = bucket.get("time") or []
+    values: list[Optional[float]] = bucket.get("relative_humidity_2m_mean") or []
+
+    if len(times) != len(values):
+        raise HTTPException(
+            status_code=502,
+            detail="Unexpected Open-Meteo response: time/value length mismatch in humidity archive",
+        )
+
+    cleaned_times: list[str] = []
+    cleaned_values: list[int] = []
+    for timestamp, value in zip(times, values):
+        if value is None:
+            continue
+        cleaned_times.append(timestamp)
+        cleaned_values.append(int(round(float(value))))
+
+    return upstream_url, cleaned_times, cleaned_values
+
+
+async def fetch_humidity_series(config: AppConfig) -> HumiditySeriesResponse:
+    resolved = await resolve_location(config)
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        upstream_url, times, values = await fetch_humidity_archive_bucket(
+            client=client,
+            latitude=resolved.latitude,
+            longitude=resolved.longitude,
+            start_date=config.start_date,
+            end_date=config.end_date,
+            timezone=config.timezone,
+        )
+
+    readings = [
+        HumidityReading(timestamp=timestamp, humidity_pct=value)
+        for timestamp, value in zip(times, values)
+    ]
+
+    return HumiditySeriesResponse(
+        start_date=config.start_date,
+        end_date=config.end_date,
+        resolved_location=resolved,
+        upstream_url=upstream_url,
+        readings=readings,
+    )
+
+
 async def fetch_current_temperature(config: CurrentLocationConfig) -> CurrentTemperatureResponse:
     resolved = await resolve_location(config)
 
     params: dict[str, str | float] = {
         "latitude": resolved.latitude,
         "longitude": resolved.longitude,
-        "current": "temperature_2m",
+        "current": "temperature_2m,relative_humidity_2m,surface_pressure",
         "timezone": config.timezone,
     }
 
@@ -469,6 +573,15 @@ async def fetch_current_temperature(config: CurrentLocationConfig) -> CurrentTem
             detail="Unexpected Open-Meteo response: missing current time or temperature_2m",
         )
 
+    humidity_raw = current.get("relative_humidity_2m")
+    humidity_pct: Optional[int] = int(humidity_raw) if humidity_raw is not None else None
+
+    elevation_raw = payload.get("elevation")
+    elevation_m: Optional[float] = float(elevation_raw) if elevation_raw is not None else None
+
+    pressure_raw = current.get("surface_pressure")
+    barometric_pressure_inhg: Optional[float] = round(float(pressure_raw) * 0.02953, 4) if pressure_raw is not None else None
+
     interval_seconds = payload.get("current_units", {}).get("interval")
     try:
         interval_seconds = int(interval_seconds) if interval_seconds is not None else None
@@ -480,6 +593,9 @@ async def fetch_current_temperature(config: CurrentLocationConfig) -> CurrentTem
         upstream_url=upstream_url,
         timestamp=str(timestamp),
         temperature_c=float(temperature),
+        humidity_pct=humidity_pct,
+        elevation_m=elevation_m,
+        barometric_pressure_inhg=barometric_pressure_inhg,
         interval_seconds=interval_seconds,
     )
 
@@ -549,8 +665,8 @@ async def fetch_scenario_curves(config: AppConfig) -> ScenarioResponse:
     }
 
     for target_day in target_days:
-        samples: list[float] = []\
-        
+        samples: list[float] = []
+
         for historical_year in historical_years:
             anchor = safe_anchor_date(target_day, historical_year)
             for offset in range(
@@ -699,6 +815,69 @@ async def get_series(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return await fetch_temperature_series(config)
+
+
+@app.post("/api/humidity/series", response_model=HumiditySeriesResponse)
+async def post_humidity_series(config: Optional[AppConfig] = None) -> HumiditySeriesResponse:
+    """
+    Return daily mean relative humidity (%) from the Open-Meteo archive.
+    Uses the same date range and location as /api/series.
+    The temperature projection path is not affected.
+    """
+    effective_config = config or load_config()
+    if effective_config is None:
+        raise HTTPException(
+            status_code=400,
+            detail="No payload provided and no saved config found",
+        )
+    return await fetch_humidity_series(effective_config)
+
+
+@app.get("/api/humidity/series", response_model=HumiditySeriesResponse)
+async def get_humidity_series(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    location_name: Optional[str] = Query(default=None),
+    latitude: Optional[float] = Query(default=None),
+    longitude: Optional[float] = Query(default=None),
+    timezone: str = Query(default="auto"),
+) -> HumiditySeriesResponse:
+    """
+    Return daily mean relative humidity (%) from the Open-Meteo archive.
+    Accepts the same query parameters as /api/series.
+    """
+    saved = load_config()
+
+    if (
+        start_date is None
+        and end_date is None
+        and location_name is None
+        and latitude is None
+        and longitude is None
+        and saved is not None
+    ):
+        return await fetch_humidity_series(saved)
+
+    if saved is not None:
+        start_date = start_date or saved.start_date
+        end_date   = end_date   or saved.end_date
+        location_name = location_name or saved.location_name
+        latitude      = latitude      or saved.latitude
+        longitude     = longitude     or saved.longitude
+
+    try:
+        config = AppConfig(
+            start_date=start_date,
+            end_date=end_date,
+            location_name=location_name,
+            latitude=latitude,
+            longitude=longitude,
+            timezone=timezone,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return await fetch_humidity_series(config)
 
 
 @app.post("/api/scenarios", response_model=ScenarioResponse)
@@ -1002,6 +1181,179 @@ async def get_forecast(
         timezone=timezone,
         days=days,
     )
+
+
+# ─── Humidity scenario models ────────────────────────────────────────────────
+
+class HumidityScenarioPoint(BaseModel):
+    date: str
+    humidity_pct: float
+
+
+class HumidityScenarioSeries(BaseModel):
+    name: str
+    percentile: Optional[int] = None
+    readings: list[HumidityScenarioPoint]
+
+
+class HumidityScenarioResponse(BaseModel):
+    source: str = "open-meteo"
+    granularity: Literal["daily"] = "daily"
+    methodology: str
+    start_date: date
+    end_date: date
+    resolved_location: LocationResolution
+    historical_years: int
+    historical_year_range: list[int]
+    climatology_window_days: int
+    scenario_percentiles: list[int]
+    upstream_urls: list[str]
+    scenarios: list[HumidityScenarioSeries]
+
+
+async def fetch_humidity_scenario_curves(config: AppConfig) -> HumidityScenarioResponse:
+    """Build percentile-based humidity scenario curves using the same
+    climatology methodology as fetch_scenario_curves for temperature.
+    Fetches historical humidity archive in a single cached request.
+    """
+    resolved = await resolve_location(config)
+    target_days = iter_dates(config.start_date, config.end_date)
+    historical_years = list(
+        range(config.start_date.year - config.historical_years, config.start_date.year)
+    )
+
+    expanded_ranges: list[tuple[int, date, date]] = []
+    for historical_year in historical_years:
+        translated_start = safe_anchor_date(config.start_date, historical_year)
+        translated_end   = safe_anchor_date(config.end_date,   historical_year)
+        expanded_ranges.append((
+            historical_year,
+            translated_start - timedelta(days=config.climatology_window_days),
+            translated_end   + timedelta(days=config.climatology_window_days),
+        ))
+
+    combined_start = min(r for _, r, _ in expanded_ranges)
+    combined_end   = max(r for _, _, r in expanded_ranges)
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        upstream_url, times, values = await fetch_humidity_archive_bucket(
+            client=client,
+            latitude=resolved.latitude,
+            longitude=resolved.longitude,
+            start_date=combined_start,
+            end_date=combined_end,
+            timezone=config.timezone,
+        )
+
+    lookup: dict[str, float] = {t: float(v) for t, v in zip(times, values)}
+
+    percentile_points: dict[int, list[HumidityScenarioPoint]] = {
+        p: [] for p in config.scenario_percentiles
+    }
+    baseline_points: list[HumidityScenarioPoint] = []
+
+    for target_day in target_days:
+        samples: list[float] = []
+        for historical_year in historical_years:
+            anchor = safe_anchor_date(target_day, historical_year)
+            for offset in range(-config.climatology_window_days, config.climatology_window_days + 1):
+                value = lookup.get((anchor + timedelta(days=offset)).isoformat())
+                if value is not None:
+                    samples.append(value)
+
+        if not samples:
+            raise HTTPException(
+                status_code=502,
+                detail=f"No humidity samples available for {target_day.isoformat()}",
+            )
+
+        baseline_points.append(HumidityScenarioPoint(
+            date=target_day.isoformat(),
+            humidity_pct=round(fmean(samples), 2),
+        ))
+        np_samples = np.asarray(samples, dtype=float)
+        for p in config.scenario_percentiles:
+            percentile_points[p].append(HumidityScenarioPoint(
+                date=target_day.isoformat(),
+                humidity_pct=round(float(np.percentile(np_samples, p)), 2),
+            ))
+
+    scenarios: list[HumidityScenarioSeries] = [
+        HumidityScenarioSeries(name="baseline_mean", percentile=None, readings=baseline_points)
+    ]
+    for p in config.scenario_percentiles:
+        scenarios.append(HumidityScenarioSeries(
+            name=label_for_percentile(p),
+            percentile=p,
+            readings=percentile_points[p],
+        ))
+
+    return HumidityScenarioResponse(
+        methodology=(
+            "Daily humidity scenario curves derived from the prior 10 years of "
+            "Open-Meteo relative_humidity_2m_mean values, using the same percentile "
+            "climatology methodology as /api/scenarios."
+        ),
+        start_date=config.start_date,
+        end_date=config.end_date,
+        resolved_location=resolved,
+        historical_years=config.historical_years,
+        historical_year_range=historical_years,
+        climatology_window_days=config.climatology_window_days,
+        scenario_percentiles=config.scenario_percentiles,
+        upstream_urls=[upstream_url],
+        scenarios=scenarios,
+    )
+
+
+@app.get("/api/scenarios/humidity", response_model=HumidityScenarioResponse)
+async def get_humidity_scenarios(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    location_name: Optional[str] = Query(default=None),
+    latitude: Optional[float] = Query(default=None),
+    longitude: Optional[float] = Query(default=None),
+    timezone: str = Query(default="auto"),
+    historical_years: int = Query(default=10),
+    climatology_window_days: int = Query(default=3),
+    scenario_percentiles: str = Query(default="10,50,75,90"),
+) -> HumidityScenarioResponse:
+    """Percentile-based daily humidity scenario curves (same methodology as /api/scenarios)."""
+    saved = load_config()
+
+    if (
+        start_date is None
+        and end_date is None
+        and location_name is None
+        and latitude is None
+        and longitude is None
+        and saved is not None
+    ):
+        return await fetch_humidity_scenario_curves(saved)
+
+    if start_date is None or end_date is None:
+        raise HTTPException(
+            status_code=400,
+            detail="start_date and end_date are required unless a saved config exists",
+        )
+
+    try:
+        config = AppConfig(
+            start_date=start_date,
+            end_date=end_date,
+            location_name=location_name,
+            latitude=latitude,
+            longitude=longitude,
+            timezone=timezone,
+            granularity="daily",
+            historical_years=historical_years,
+            climatology_window_days=climatology_window_days,
+            scenario_percentiles=[int(x) for x in scenario_percentiles.split(",") if x],
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return await fetch_humidity_scenario_curves(config)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,19 @@
+{
+  "config": {
+    "start_date": "2026-04-15",
+    "end_date": "2026-07-14",
+    "location_name": "Warsaw",
+    "latitude": null,
+    "longitude": null,
+    "timezone": "auto",
+    "granularity": "daily",
+    "historical_years": 10,
+    "climatology_window_days": 3,
+    "scenario_percentiles": [
+      10,
+      50,
+      75,
+      90
+    ]
+  }
+}

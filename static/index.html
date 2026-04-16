@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ambient Temperature Forecast</title>
+  <title>Ambient Weather Forecast</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     :root {
@@ -15,378 +15,93 @@
       --accent: #2563eb;
       --accent-light: #eff6ff;
       --green: #059669;
-      --green-light: #ecfdf5;
       --amber: #d97706;
-      --amber-light: #fffbeb;
       --red: #dc2626;
       --red-light: #fef2f2;
+      --teal: #0891b2;
       --shadow: 0 4px 20px rgba(0,0,0,0.07);
       --radius: 14px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
-    .wrap {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 32px 20px 60px;
-    }
-
-    /* Header */
-    .header {
-      margin-bottom: 28px;
-    }
-    .header h1 {
-      font-size: 26px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      color: var(--text);
-    }
-    .header p {
-      color: var(--muted);
-      font-size: 14px;
-      margin-top: 4px;
-    }
-
-    /* Controls row */
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 20px 60px; }
+    .header { margin-bottom: 28px; }
+    .header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+    .header p { color: var(--muted); font-size: 14px; margin-top: 4px; }
     .controls {
-      display: flex;
-      gap: 12px;
-      align-items: flex-end;
-      flex-wrap: wrap;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 20px;
-      margin-bottom: 18px;
+      display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
+      background: var(--panel); border: 1px solid var(--line);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 20px; margin-bottom: 18px;
     }
-    .control-group {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      min-width: 160px;
-    }
+    .control-group { display: flex; flex-direction: column; gap: 6px; min-width: 160px; }
     .control-group.grow { flex: 1; }
-    .control-group label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--muted);
-    }
-    .control-group input {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: 10px 12px;
-      font: inherit;
-      font-size: 14px;
-      background: white;
-      width: 100%;
-      transition: border-color 0.15s;
-    }
-    .control-group input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-    .control-group .slider-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .control-group input[type=range] {
-      flex: 1;
-      padding: 0;
-      border: none;
-      accent-color: var(--accent);
-      cursor: pointer;
-    }
-    .slider-val {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--accent);
-      min-width: 52px;
-      text-align: right;
-    }
-    .divider {
-      width: 1px;
-      background: var(--line);
-      align-self: stretch;
-      margin: 0 4px;
-    }
-    .btn {
-      border: none;
-      border-radius: 10px;
-      padding: 11px 18px;
-      font: inherit;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: opacity 0.15s, transform 0.1s;
-      white-space: nowrap;
-    }
+    .control-group label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+    .control-group input { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 14px; background: white; width: 100%; }
+    .control-group input:focus { outline: none; border-color: var(--accent); }
+    .slider-row { display: flex; align-items: center; gap: 10px; }
+    .control-group input[type=range] { flex: 1; padding: 0; border: none; accent-color: var(--accent); cursor: pointer; }
+    .slider-val { font-size: 13px; font-weight: 700; color: var(--accent); min-width: 52px; text-align: right; }
+    .divider { width: 1px; background: var(--line); align-self: stretch; margin: 0 4px; }
+    .btn { border: none; border-radius: 10px; padding: 11px 18px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
     .btn:hover { opacity: 0.88; }
-    .btn:active { transform: scale(0.97); }
     .btn-primary { background: var(--accent); color: white; }
-    .btn-ghost {
-      background: var(--accent-light);
-      color: var(--accent);
-    }
-    .btn-sm {
-      padding: 8px 14px;
-      font-size: 13px;
-    }
-
-    /* Current temp card */
-    .current-row {
-      display: flex;
-      gap: 14px;
-      margin-bottom: 18px;
-      flex-wrap: wrap;
-      align-items: stretch;
-    }
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 18px 22px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .card-icon {
-      font-size: 28px;
-      line-height: 1;
-    }
-    .card-body .label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--muted);
-      margin-bottom: 3px;
-    }
-    .card-body .value {
-      font-size: 28px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1;
-    }
-    .card-body .sub {
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 3px;
-    }
-    .temp-cool { color: #2563eb; }
-    .temp-mild { color: #059669; }
-    .temp-warm { color: #d97706; }
-    .temp-hot  { color: #dc2626; }
-
-    .percentile-badge {
-      display: inline-block;
-      padding: 3px 9px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      margin-left: 8px;
-      vertical-align: middle;
-    }
-    .badge-cool { background: #dbeafe; color: #1d4ed8; }
-    .badge-median { background: #d1fae5; color: #065f46; }
-    .badge-warm { background: #fef3c7; color: #92400e; }
-    .badge-hot { background: #fee2e2; color: #991b1b; }
-    .badge-unknown { background: #f3f4f6; color: #6b7280; }
-
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 5px;
-    }
-    .dot-green { background: var(--green); }
-    .dot-amber { background: var(--amber); }
-    .dot-grey  { background: #d1d5db; }
-
-    /* Chart panel */
-    .chart-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 24px;
-      margin-bottom: 18px;
-    }
-    .chart-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .chart-title {
-      font-size: 16px;
-      font-weight: 700;
-    }
-    .chart-subtitle {
-      font-size: 13px;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-    .legend {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .legend-line {
-      width: 24px;
-      height: 3px;
-      border-radius: 2px;
-    }
-    .legend-band {
-      width: 24px;
-      height: 10px;
-      border-radius: 3px;
-      opacity: 0.4;
-    }
-    .legend-dashed {
-      width: 24px;
-      height: 0;
-      border-top: 2px dashed;
-      opacity: 0.7;
-    }
-    .chart-container {
-      position: relative;
-      height: 380px;
-    }
-
-    /* Transition annotation */
-    .transition-note {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 10px;
-      padding: 8px 12px;
-      background: #f8faff;
-      border-radius: 8px;
-      border-left: 3px solid var(--accent);
-    }
-
-    /* Data table */
-    .table-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    .table-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+    .btn-ghost { background: var(--accent-light); color: var(--accent); }
+    .btn-sm { padding: 8px 14px; font-size: 13px; }
+    .current-row { display: flex; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; align-items: stretch; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 22px; display: flex; align-items: center; gap: 16px; }
+    .card-icon { font-size: 28px; line-height: 1; }
+    .card-body .label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 3px; }
+    .card-body .value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+    .card-body .sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .temp-cool { color: #2563eb; } .temp-mild { color: #059669; } .temp-warm { color: #d97706; } .temp-hot { color: #dc2626; }
+    .hum-low { color: #059669; } .hum-mid { color: #0891b2; } .hum-high { color: #7c3aed; }
+    .percentile-badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-left: 8px; vertical-align: middle; }
+    .badge-cool { background: #dbeafe; color: #1d4ed8; } .badge-median { background: #d1fae5; color: #065f46; }
+    .badge-warm { background: #fef3c7; color: #92400e; } .badge-hot { background: #fee2e2; color: #991b1b; }
+    .chart-panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; margin-bottom: 18px; }
+    .chart-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .chart-title { font-size: 16px; font-weight: 700; }
+    .chart-subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    .legend-swatch { width: 24px; height: 3px; border-radius: 2px; }
+    .legend-band { width: 24px; height: 10px; border-radius: 3px; opacity: 0.4; }
+    .chart-container { position: relative; height: 380px; }
+    .chart-container-sm { position: relative; height: 240px; }
+    .note-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 10px; padding: 8px 12px; background: #f8faff; border-radius: 8px; border-left: 3px solid var(--accent); }
+    .table-panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .table-header { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
     .table-header h3 { font-size: 15px; font-weight: 700; }
-    .table-scroll {
-      overflow-x: auto;
-      max-height: 320px;
-      overflow-y: auto;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th {
-      background: #f8faff;
-      padding: 10px 14px;
-      text-align: left;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--muted);
-      border-bottom: 1px solid var(--line);
-      position: sticky;
-      top: 0;
-    }
-    td {
-      padding: 9px 14px;
-      border-bottom: 1px solid #f3f4f6;
-    }
+    .table-scroll { overflow-x: auto; max-height: 320px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: #f8faff; padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+    td { padding: 9px 14px; border-bottom: 1px solid #f3f4f6; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #fafbff; }
-    .td-source {
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .source-forecast { color: var(--green); font-weight: 600; }
-    .source-climate  { color: var(--amber); font-weight: 600; }
-
-    /* Loading / empty state */
-    .empty {
-      text-align: center;
-      padding: 60px 20px;
-      color: var(--muted);
-    }
+    .source-forecast { color: var(--green); font-weight: 600; font-size: 11px; }
+    .source-climate { color: var(--amber); font-weight: 600; font-size: 11px; }
+    .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
     .empty .icon { font-size: 42px; margin-bottom: 12px; }
     .empty p { font-size: 14px; }
-    .spinner {
-      display: inline-block;
-      width: 20px; height: 20px;
-      border: 2px solid #dde4ef;
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 8px;
-    }
+    .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #dde4ef; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    .error-msg {
-      background: var(--red-light);
-      color: var(--red);
-      border: 1px solid #fecaca;
-      border-radius: 10px;
-      padding: 12px 16px;
-      font-size: 13px;
-      margin-top: 12px;
-    }
+    .error-msg { background: var(--red-light); color: var(--red); border: 1px solid #fecaca; border-radius: 10px; padding: 12px 16px; font-size: 13px; margin-top: 12px; }
   </style>
 </head>
 <body>
 <div class="wrap">
   <div class="header">
-    <h1>Ambient Temperature Forecast</h1>
-    <p>Real forecast blended with 10-year climatology — for projection window planning</p>
+    <h1>Ambient Weather Forecast</h1>
+    <p>Temperature &amp; humidity — real forecast blended with 10-year climatology</p>
   </div>
 
-  <!-- Controls -->
   <div class="controls">
     <div class="control-group grow">
       <label>Location</label>
       <input id="location" placeholder="e.g. Valencia, Warsaw, Dubai" value="Valencia" />
     </div>
-
     <div class="divider"></div>
-
     <div class="control-group" style="min-width:200px;">
       <label>Projection window</label>
       <div class="slider-row">
@@ -394,28 +109,29 @@
         <span class="slider-val" id="projDaysVal">90 days</span>
       </div>
     </div>
-
     <div class="divider"></div>
-
-    <button class="btn btn-ghost btn-sm" id="getTempBtn">
-      🌡 Get current temp
-    </button>
-    <button class="btn btn-primary" id="runBtn">
-      Run projection
-    </button>
+    <button class="btn btn-ghost btn-sm" id="getTempBtn">🌡 Get current</button>
+    <button class="btn btn-primary" id="runBtn">Run projection</button>
   </div>
 
-  <!-- Current temp + status cards -->
   <div class="current-row" id="currentRow" style="display:none">
-    <div class="card" id="currentTempCard">
+    <div class="card">
       <div class="card-icon">🌡</div>
       <div class="card-body">
-        <div class="label">Current temperature</div>
+        <div class="label">Temperature</div>
         <div class="value" id="currentTempVal">—</div>
         <div class="sub" id="currentTempSub">—</div>
       </div>
     </div>
-    <div class="card" id="percentileCard" style="flex:1; min-width:220px;">
+    <div class="card">
+      <div class="card-icon">💧</div>
+      <div class="card-body">
+        <div class="label">Humidity</div>
+        <div class="value" id="currentHumVal">—</div>
+        <div class="sub" id="currentHumSub">—</div>
+      </div>
+    </div>
+    <div class="card" style="flex:1; min-width:220px;">
       <div class="card-icon" id="percentileIcon">📊</div>
       <div class="card-body">
         <div class="label">vs 10-year climatology</div>
@@ -423,7 +139,23 @@
         <div class="sub" id="percentileSub">—</div>
       </div>
     </div>
-    <div class="card" id="horizonCard" style="flex:1; min-width:220px;">
+    <div class="card">
+      <div class="card-icon">⛰</div>
+      <div class="card-body">
+        <div class="label">Elevation</div>
+        <div class="value" id="currentElevVal">—</div>
+        <div class="sub" id="currentElevSub">—</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🌬</div>
+      <div class="card-body">
+        <div class="label">Pressure</div>
+        <div class="value" id="currentPressVal">—</div>
+        <div class="sub" id="currentPressSub">—</div>
+      </div>
+    </div>
+    <div class="card" style="flex:1; min-width:200px;">
       <div class="card-icon">📅</div>
       <div class="card-body">
         <div class="label">Projection horizon</div>
@@ -433,38 +165,49 @@
     </div>
   </div>
 
-  <!-- Chart -->
+  <!-- Temperature chart -->
   <div class="chart-panel">
     <div class="chart-header">
       <div>
         <div class="chart-title">Temperature Projection</div>
         <div class="chart-subtitle" id="chartSubtitle">Configure location and run projection</div>
       </div>
-      <div class="legend" id="legend" style="display:none">
-        <div class="legend-item">
-          <div class="legend-line" style="background:#2563eb;"></div>
-          <span>Forecast (actual)</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-line" style="background:#2563eb; opacity:0.5; border-top: 2px dashed #2563eb; height:0; background:none;"></div>
-          <span>Median (P50)</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-band" style="background:#f59e0b;"></div>
-          <span>P10–P90 band</span>
-        </div>
+      <div class="legend" id="tempLegend" style="display:none">
+        <div class="legend-item"><div class="legend-swatch" style="background:#2563eb;"></div><span>Forecast</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#2563eb;opacity:0.5;"></div><span>Median P50</span></div>
+        <div class="legend-item"><div class="legend-band" style="background:#f59e0b;"></div><span>P10–P90</span></div>
       </div>
     </div>
     <div class="chart-container">
-      <canvas id="chart"></canvas>
-      <div class="empty" id="chartEmpty">
+      <canvas id="tempChart"></canvas>
+      <div class="empty" id="tempChartEmpty">
         <div class="icon">🌤</div>
         <p>Enter a location and click <strong>Run projection</strong></p>
       </div>
     </div>
-    <div class="transition-note" id="transitionNote" style="display:none">
-      <span>📍</span>
-      <span id="transitionText">Days 0–7: actual meteorological forecast &nbsp;|&nbsp; Day 8–16: extended forecast (lower accuracy) &nbsp;|&nbsp; Day 17+: 10-year climatology percentile band</span>
+    <div class="note-bar" id="transitionNote" style="display:none">
+      <span>📍</span><span id="transitionText">—</span>
+    </div>
+  </div>
+
+  <!-- Humidity chart -->
+  <div class="chart-panel" id="humPanel" style="display:none">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Humidity Projection</div>
+        <div class="chart-subtitle" id="humSubtitle">Daily mean relative humidity (%)</div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:#0891b2;"></div><span>Projected humidity</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#7c3aed;border-top:2px dashed #7c3aed;height:0;background:none;width:24px;"></div><span>Condensation risk (70%)</span></div>
+      </div>
+    </div>
+    <div class="chart-container-sm">
+      <canvas id="humChart"></canvas>
+    </div>
+    <div class="note-bar" style="border-color:var(--teal)">
+      <span>💧</span>
+      <span id="humNote">—</span>
     </div>
   </div>
 
@@ -472,22 +215,15 @@
   <div class="table-panel">
     <div class="table-header">
       <h3>Data table</h3>
-      <span class="td-source" id="tableInfo">No data loaded</span>
+      <span style="font-size:11px;color:var(--muted)" id="tableInfo">No data loaded</span>
     </div>
     <div class="table-scroll">
-      <div class="empty" id="tableEmpty" style="padding:40px 20px;">
-        <p style="font-size:13px;">Run a projection to see data</p>
-      </div>
+      <div class="empty" id="tableEmpty" style="padding:40px 20px;"><p style="font-size:13px;">Run a projection to see data</p></div>
       <table id="dataTable" style="display:none">
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Source</th>
-            <th>Central (°C)</th>
-            <th>P10 cool (°C)</th>
-            <th>P50 median (°C)</th>
-            <th>P75 warm (°C)</th>
-            <th>P90 hot (°C)</th>
+            <th>Date</th><th>Source</th><th>Temp °C</th><th>Humidity %</th>
+            <th>P10 °C</th><th>P50 °C</th><th>P75 °C</th><th>P90 °C</th>
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -499,296 +235,210 @@
 </div>
 
 <script>
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-function addDays(dateStr, n) {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-function fmt(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-GB', { day:'numeric', month:'short' });
-}
-function tempColor(c) {
-  if (c < 5)  return '#60a5fa';
-  if (c < 15) return '#2563eb';
-  if (c < 22) return '#059669';
-  if (c < 30) return '#d97706';
-  return '#dc2626';
-}
-function tempClass(c) {
-  if (c < 10) return 'temp-cool';
-  if (c < 20) return 'temp-mild';
-  if (c < 28) return 'temp-warm';
-  return 'temp-hot';
-}
-function showError(msg) {
-  const el = document.getElementById('errorMsg');
-  el.textContent = msg;
-  el.style.display = 'block';
-  setTimeout(() => el.style.display = 'none', 8000);
-}
-function clearError() {
-  document.getElementById('errorMsg').style.display = 'none';
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function today() { return new Date().toISOString().slice(0, 10); }
+function addDays(s, n) { const d = new Date(s); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+function subYears(s, n) { const d = new Date(s); d.setFullYear(d.getFullYear() - n); return d.toISOString().slice(0, 10); }
+function fmt(s) { return new Date(s + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }); }
+function tempClass(c) { return c < 10 ? 'temp-cool' : c < 20 ? 'temp-mild' : c < 28 ? 'temp-warm' : 'temp-hot'; }
+function humClass(h) { return h < 40 ? 'hum-low' : h < 70 ? 'hum-mid' : 'hum-high'; }
+function humLabel(h) { return h < 40 ? 'Low — minimal condensation risk' : h < 60 ? 'Moderate' : h < 70 ? 'Elevated — monitor oil condition' : 'High — condensation risk active'; }
+function showError(msg) { const el = document.getElementById('errorMsg'); el.textContent = msg; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 8000); }
+function clearError() { document.getElementById('errorMsg').style.display = 'none'; }
 
-// ── Slider ───────────────────────────────────────────────────────────────────
-const slider = document.getElementById('projDays');
-const sliderVal = document.getElementById('projDaysVal');
-slider.addEventListener('input', () => {
-  sliderVal.textContent = slider.value + ' days';
+document.getElementById('projDays').addEventListener('input', function() {
+  document.getElementById('projDaysVal').textContent = this.value + ' days';
 });
 
-// ── Chart ────────────────────────────────────────────────────────────────────
-let chartInstance = null;
+// ── Chart instances ───────────────────────────────────────────────────────────
+let tempChartInst = null;
+let humChartInst = null;
+let lastProjection = null;
 
-function buildChart(labels, centralData, p10Data, p50Data, p90Data, forecastCount, reliableCount) {
-  const canvas = document.getElementById('chart');
-  document.getElementById('chartEmpty').style.display = 'none';
-  document.getElementById('legend').style.display = 'flex';
+// ── Temperature chart ─────────────────────────────────────────────────────────
+function buildTempChart(labels, central, p10, p50, p90, fcCount, relCount) {
+  document.getElementById('tempChartEmpty').style.display = 'none';
+  document.getElementById('tempLegend').style.display = 'flex';
   document.getElementById('transitionNote').style.display = 'flex';
-
-  if (chartInstance) chartInstance.destroy();
+  if (tempChartInst) tempChartInst.destroy();
 
   const n = labels.length;
-
-  // Forecast segment (solid blue) — only up to forecastCount
-  // After forecastCount: null so line stops
-  const forecastLine = centralData.map((v, i) => i < forecastCount ? v : null);
-
-  // Median climatology line (dashed, starts where forecast ends)
-  // We overlap by 1 point for visual continuity
-  const medianLine = p50Data.map((v, i) => i >= forecastCount - 1 ? v : null);
-
-  // Band: P10 bottom, P90 top — only in climatology zone
-  // In forecast zone: band collapses to central line (width = 0 = no uncertainty)
-  const bandHigh = p90Data.map((v, i) => {
-    if (i < reliableCount) return centralData[i]; // no band in reliable forecast
-    // Gradually open the band from reliableCount to forecastCount
-    if (i < forecastCount) {
-      const t = (i - reliableCount) / Math.max(1, forecastCount - reliableCount);
-      return centralData[i] + t * (v - centralData[i]);
-    }
+  const fcLine = central.map((v, i) => i < fcCount ? v : null);
+  const medLine = p50.map((v, i) => i >= fcCount - 1 ? v : null);
+  const bHigh = p90.map((v, i) => {
+    if (i < relCount) return central[i];
+    if (i < fcCount) { const t = (i - relCount) / Math.max(1, fcCount - relCount); return central[i] + t * (v - central[i]); }
     return v;
   });
-  const bandLow = p10Data.map((v, i) => {
-    if (i < reliableCount) return centralData[i];
-    if (i < forecastCount) {
-      const t = (i - reliableCount) / Math.max(1, forecastCount - reliableCount);
-      return centralData[i] + t * (v - centralData[i]);
-    }
+  const bLow = p10.map((v, i) => {
+    if (i < relCount) return central[i];
+    if (i < fcCount) { const t = (i - relCount) / Math.max(1, fcCount - relCount); return central[i] + t * (v - central[i]); }
     return v;
   });
 
-  // Plugin: vertical transition line at forecastCount
-  const transitionPlugin = {
-    id: 'transitionLines',
+  const vPlugin = {
+    id: 'vlines',
     afterDraw(chart) {
-      const ctx = chart.ctx;
-      const xAxis = chart.scales.x;
-      const yAxis = chart.scales.y;
-
-      const drawLine = (idx, color, label) => {
+      const ctx = chart.ctx, x = chart.scales.x, y = chart.scales.y;
+      [[relCount, '#2563eb', 'Forecast confidence ↓'], [fcCount, '#f59e0b', 'Climatology →']].forEach(([idx, color, label]) => {
         if (idx <= 0 || idx >= n) return;
-        const x = xAxis.getPixelForValue(idx);
-        ctx.save();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        ctx.globalAlpha = 0.5;
-        ctx.beginPath();
-        ctx.moveTo(x, yAxis.top);
-        ctx.lineTo(x, yAxis.bottom);
-        ctx.stroke();
-        ctx.globalAlpha = 0.8;
-        ctx.setLineDash([]);
-        ctx.font = '11px Inter, sans-serif';
-        ctx.fillStyle = color;
-        ctx.textAlign = 'left';
-        ctx.fillText(label, x + 4, yAxis.top + 14);
+        const px = x.getPixelForValue(idx);
+        ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]); ctx.globalAlpha = 0.5;
+        ctx.beginPath(); ctx.moveTo(px, y.top); ctx.lineTo(px, y.bottom); ctx.stroke();
+        ctx.globalAlpha = 0.8; ctx.setLineDash([]); ctx.font = '11px Inter,sans-serif';
+        ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.fillText(label, px + 4, y.top + 14);
         ctx.restore();
-      };
-
-      drawLine(reliableCount, '#2563eb', 'Forecast confidence ↓');
-      drawLine(forecastCount, '#f59e0b', 'Climatology →');
+      });
     }
   };
 
-  chartInstance = new Chart(canvas, {
-    type: 'line',
-    plugins: [transitionPlugin],
-    data: {
-      labels: labels,
-      datasets: [
-        // P90–P10 fill band (climatology zone)
-        {
-          label: 'P90 (hot)',
-          data: bandHigh,
-          borderColor: 'transparent',
-          backgroundColor: 'rgba(245, 158, 11, 0.15)',
-          pointRadius: 0,
-          tension: 0.35,
-          fill: '+1', // fill to next dataset
-          order: 4,
-        },
-        {
-          label: 'P10 (cool)',
-          data: bandLow,
-          borderColor: 'transparent',
-          backgroundColor: 'rgba(245, 158, 11, 0.15)',
-          pointRadius: 0,
-          tension: 0.35,
-          fill: false,
-          order: 5,
-        },
-        // Median climatology (dashed)
-        {
-          label: 'Median P50',
-          data: medianLine,
-          borderColor: 'rgba(37, 99, 235, 0.5)',
-          borderWidth: 2,
-          borderDash: [6, 4],
-          backgroundColor: 'transparent',
-          pointRadius: 0,
-          tension: 0.35,
-          fill: false,
-          order: 2,
-        },
-        // Forecast line (solid)
-        {
-          label: 'Forecast',
-          data: forecastLine,
-          borderColor: '#2563eb',
-          borderWidth: 2.5,
-          backgroundColor: 'transparent',
-          pointRadius: 0,
-          pointHoverRadius: 5,
-          tension: 0.35,
-          fill: false,
-          order: 1,
-        },
-      ]
-    },
+  tempChartInst = new Chart(document.getElementById('tempChart'), {
+    type: 'line', plugins: [vPlugin],
+    data: { labels, datasets: [
+      { label:'P90', data:bHigh, borderColor:'transparent', backgroundColor:'rgba(245,158,11,0.15)', pointRadius:0, tension:0.35, fill:'+1', order:4 },
+      { label:'P10', data:bLow, borderColor:'transparent', backgroundColor:'rgba(245,158,11,0.15)', pointRadius:0, tension:0.35, fill:false, order:5 },
+      { label:'Median P50', data:medLine, borderColor:'rgba(37,99,235,0.5)', borderWidth:2, borderDash:[6,4], backgroundColor:'transparent', pointRadius:0, tension:0.35, fill:false, order:2 },
+      { label:'Forecast', data:fcLine, borderColor:'#2563eb', borderWidth:2.5, backgroundColor:'transparent', pointRadius:0, pointHoverRadius:5, tension:0.35, fill:false, order:1 },
+    ]},
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
+      responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: 'rgba(15, 23, 42, 0.92)',
-          titleFont: { size: 12, weight: '600' },
-          bodyFont: { size: 12 },
-          padding: 12,
-          callbacks: {
-            title(items) {
-              const i = items[0].dataIndex;
-              const src = i < reliableCount ? '📡 Forecast (reliable)' :
-                          i < forecastCount ? '📡 Forecast (extended)' :
-                          '📊 Climatology';
-              return labels[i] + '  ' + src;
-            },
-            label(item) {
-              if (item.dataset.label === 'P10 (cool)') return null;
-              if (item.raw === null) return null;
-              const label = item.dataset.label;
-              return `  ${label}: ${item.raw?.toFixed(1)}°C`;
-            }
+        legend:{display:false},
+        tooltip:{backgroundColor:'rgba(15,23,42,0.92)', padding:12,
+          callbacks:{
+            title(items) { const i=items[0].dataIndex; return labels[i]+'  '+(i<relCount?'📡 Forecast':i<fcCount?'📡 Extended':'📊 Climatology'); },
+            label(item) { if(item.dataset.label==='P10'||item.raw===null) return null; return `  ${item.dataset.label}: ${item.raw?.toFixed(1)}°C`; }
           }
         }
       },
       scales: {
-        x: {
-          ticks: {
-            maxTicksLimit: 12,
-            font: { size: 11 },
-            color: '#9ca3af',
-            callback(val, i) { return labels[i]; }
-          },
-          grid: { color: '#f3f4f6' }
-        },
-        y: {
-          ticks: {
-            font: { size: 11 },
-            color: '#9ca3af',
-            callback: v => v + '°C'
-          },
-          grid: { color: '#f3f4f6' }
-        }
+        x:{ ticks:{maxTicksLimit:12,font:{size:11},color:'#9ca3af',callback(v,i){return labels[i];}}, grid:{color:'#f3f4f6'} },
+        y:{ ticks:{font:{size:11},color:'#9ca3af',callback:v=>v+'°C'}, grid:{color:'#f3f4f6'} }
       }
     }
   });
 }
 
-// ── State ────────────────────────────────────────────────────────────────────
-let lastProjection = null;
+// ── Humidity chart ────────────────────────────────────────────────────────────
+function buildHumChart(labels, humData, isClimatology) {
+  if (humChartInst) humChartInst.destroy();
 
-// ── Current temp ──────────────────────────────────────────────────────────────
+  const threshold = humData.map(() => 70);
+  const highRisk = humData.filter(v => v !== null && v >= 70).length;
+  const avg = humData.filter(v=>v!==null).reduce((a,b)=>a+b,0) / humData.filter(v=>v!==null).length;
+
+  document.getElementById('humNote').textContent =
+    `${isClimatology ? 'Climatological projection based on 10-year archive. ' : ''}` +
+    `Average: ${avg.toFixed(0)}% · Days above condensation threshold (70%): ${highRisk} of ${humData.filter(v=>v!==null).length}. ` +
+    (avg >= 70 ? 'High condensation risk — oil acid formation accelerated.' : avg >= 55 ? 'Moderate humidity — monitor oil TAN.' : 'Low humidity — minimal condensation risk.');
+
+  humChartInst = new Chart(document.getElementById('humChart'), {
+    type: 'line',
+    data: { labels, datasets: [
+      { label:'Humidity %', data:humData, borderColor:'#0891b2', borderWidth:2, backgroundColor:'rgba(8,145,178,0.08)', pointRadius:0, pointHoverRadius:4, tension:0.35, fill:'origin' },
+      { label:'Condensation risk', data:threshold, borderColor:'#7c3aed', borderWidth:1.5, borderDash:[4,4], backgroundColor:'transparent', pointRadius:0, fill:false },
+    ]},
+    options: {
+      responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins: {
+        legend:{display:false},
+        tooltip:{backgroundColor:'rgba(15,23,42,0.92)', padding:10,
+          callbacks:{
+            label(item) {
+              if(item.dataset.label==='Condensation risk') return null;
+              const v = item.raw; if(v===null) return null;
+              return `  Humidity: ${v}%${v>=70?' ⚠ condensation risk':v>=60?' elevated':''}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x:{ ticks:{maxTicksLimit:10,font:{size:11},color:'#9ca3af',callback(v,i){return labels[i];}}, grid:{color:'#f3f4f6'} },
+        y:{ min:0, max:100, ticks:{font:{size:11},color:'#9ca3af',callback:v=>v+'%'}, grid:{color:'#f3f4f6'} }
+      }
+    }
+  });
+}
+
+// ── Current conditions ────────────────────────────────────────────────────────
 document.getElementById('getTempBtn').addEventListener('click', async () => {
   const loc = document.getElementById('location').value.trim();
   if (!loc) { showError('Enter a location first'); return; }
   const btn = document.getElementById('getTempBtn');
-  btn.innerHTML = '<span class="spinner"></span>Fetching…';
-  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Fetching…'; btn.disabled = true;
   clearError();
   try {
-    const res = await fetch(`/api/current?location_name=${encodeURIComponent(loc)}`);
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.detail || JSON.stringify(d));
-    renderCurrentTemp(d, loc);
-  } catch(e) {
-    showError('Current temp error: ' + e.message);
-  } finally {
-    btn.innerHTML = '🌡 Get current temp';
-    btn.disabled = false;
-  }
+    const r = await fetch(`/api/current?location_name=${encodeURIComponent(loc)}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+    renderCurrentConditions(d);
+  } catch(e) { showError('Error: ' + e.message); }
+  finally { btn.innerHTML = '🌡 Get current'; btn.disabled = false; }
 });
 
-function renderCurrentTemp(d, loc) {
+function renderCurrentConditions(d) {
   const tc = d.temperature_c;
-  const el = document.getElementById('currentTempVal');
-  el.textContent = tc.toFixed(1) + '°C';
-  el.className = 'value ' + tempClass(tc);
-
+  const tempEl = document.getElementById('currentTempVal');
+  tempEl.textContent = tc.toFixed(1) + '°C';
+  tempEl.className = 'value ' + tempClass(tc);
   document.getElementById('currentTempSub').textContent =
-    d.resolved_location.name + (d.resolved_location.country ? ', ' + d.resolved_location.country : '') +
-    ' · ' + d.timestamp.slice(0,16).replace('T',' ');
+    d.resolved_location.name + (d.resolved_location.country ? ', ' + d.resolved_location.country : '') + ' · ' + d.timestamp.slice(0,16).replace('T',' ');
 
-  // Check vs climatology if we have data
-  if (lastProjection) {
-    updatePercentileCard(tc, lastProjection);
+  const hum = d.humidity_pct;
+  const humEl = document.getElementById('currentHumVal');
+  if (hum != null) {
+    humEl.textContent = hum + '%';
+    humEl.className = 'value ' + humClass(hum);
+    document.getElementById('currentHumSub').textContent = humLabel(hum);
+  } else {
+    humEl.textContent = '—'; humEl.className = 'value';
+    document.getElementById('currentHumSub').textContent = 'Not available';
+  }
+
+  if (lastProjection) updatePercentileCard(tc, lastProjection);
+
+  const elev = d.elevation_m;
+  const elevEl = document.getElementById('currentElevVal');
+  if (elev != null) {
+    elevEl.textContent = Math.round(elev) + ' m';
+    elevEl.className = 'value';
+    const elevDesc = elev < 100 ? 'Sea level — standard air density' :
+                     elev < 500 ? 'Low elevation — minimal pressure effect' :
+                     elev < 1500 ? 'Mid elevation — reduced inlet density' :
+                     'High elevation — significant density reduction';
+    document.getElementById('currentElevSub').textContent = elevDesc;
+  } else {
+    elevEl.textContent = '—'; elevEl.className = 'value';
+    document.getElementById('currentElevSub').textContent = 'Not available';
+  }
+
+  const press = d.barometric_pressure_inhg;
+  const pressEl = document.getElementById('currentPressVal');
+  if (press != null) {
+    pressEl.textContent = press.toFixed(2) + ' inHg';
+    pressEl.className = 'value';
+    const pressDesc = press < 29.0 ? 'Low — storm conditions' :
+                      press < 29.92 ? 'Below normal' :
+                      press < 30.5 ? 'Normal — stable' :
+                      'High — clear conditions';
+    document.getElementById('currentPressSub').textContent = pressDesc;
+  } else {
+    pressEl.textContent = '—'; pressEl.className = 'value';
+    document.getElementById('currentPressSub').textContent = 'Not available';
   }
 
   document.getElementById('currentRow').style.display = 'flex';
 }
 
-function updatePercentileCard(currentC, proj) {
-  // Find today's climatology values
-  const today_str = today();
-  const row = proj.rows.find(r => r.date === today_str) || proj.rows[0];
+function updatePercentileCard(tc, proj) {
+  const row = proj.rows.find(r => r.date === today()) || proj.rows[0];
   if (!row) return;
-
   let badge, icon, text;
-  if (currentC <= row.p10) {
-    badge = '<span class="percentile-badge badge-cool">Below P10 — unusually cool</span>';
-    icon = '🧊'; text = `${currentC.toFixed(1)}°C is cooler than 90% of historical days`;
-  } else if (currentC <= row.p50) {
-    badge = '<span class="percentile-badge badge-median">P10–P50 — cool to normal</span>';
-    icon = '🌤'; text = `${currentC.toFixed(1)}°C — below median for this time of year`;
-  } else if (currentC <= row.p75) {
-    badge = '<span class="percentile-badge badge-warm">P50–P75 — warm</span>';
-    icon = '☀️'; text = `${currentC.toFixed(1)}°C — above median, normal range`;
-  } else if (currentC <= row.p90) {
-    badge = '<span class="percentile-badge badge-warm">P75–P90 — hot</span>';
-    icon = '🌡'; text = `${currentC.toFixed(1)}°C — warmer than 75% of historical days`;
-  } else {
-    badge = '<span class="percentile-badge badge-hot">Above P90 — unusually hot</span>';
-    icon = '🔥'; text = `${currentC.toFixed(1)}°C — hotter than 90% of historical days`;
-  }
-
+  if (tc <= row.p10)      { badge='<span class="percentile-badge badge-cool">Below P10 — unusually cool</span>'; icon='🧊'; text=`${tc.toFixed(1)}°C is cooler than 90% of historical days`; }
+  else if (tc <= row.p50) { badge='<span class="percentile-badge badge-median">P10–P50 — cool to normal</span>'; icon='🌤'; text=`${tc.toFixed(1)}°C — below median for this time of year`; }
+  else if (tc <= row.p75) { badge='<span class="percentile-badge badge-warm">P50–P75 — warm</span>'; icon='☀️'; text=`${tc.toFixed(1)}°C — above median, normal range`; }
+  else if (tc <= row.p90) { badge='<span class="percentile-badge badge-warm">P75–P90 — hot</span>'; icon='🌡'; text=`${tc.toFixed(1)}°C — warmer than 75% of historical days`; }
+  else                    { badge='<span class="percentile-badge badge-hot">Above P90 — unusually hot</span>'; icon='🔥'; text=`${tc.toFixed(1)}°C — hotter than 90% of historical days`; }
   document.getElementById('percentileIcon').textContent = icon;
   document.getElementById('percentileVal').innerHTML = badge;
   document.getElementById('percentileSub').textContent = text;
@@ -800,172 +450,148 @@ document.getElementById('runBtn').addEventListener('click', runProjection);
 async function runProjection() {
   const loc = document.getElementById('location').value.trim();
   if (!loc) { showError('Enter a location first'); return; }
-  const days = parseInt(slider.value, 10);
+  const days = parseInt(document.getElementById('projDays').value, 10);
   const startDate = today();
   const endDate = addDays(startDate, days);
 
   const btn = document.getElementById('runBtn');
-  btn.innerHTML = '<span class="spinner"></span>Running…';
-  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Running…'; btn.disabled = true;
   clearError();
 
   try {
-    // Parallel: forecast (16 days) + scenarios (full window)
-    const [fcRes, scRes] = await Promise.all([
+    // Humidity: fetch last year's archive for the same date range as a climatological proxy.
+    // This mirrors how we use 10-year temperature data past the 16-day forecast window.
+    const humStart = subYears(startDate, 1);
+    const humEnd   = subYears(endDate, 1);
+
+    const [fcRes, scRes, humRes] = await Promise.all([
       fetch(`/api/forecast?days=16&location_name=${encodeURIComponent(loc)}`),
       fetch('/api/scenarios', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify({
-          location_name: loc,
-          start_date: startDate,
-          end_date: endDate,
-          granularity: 'daily',
-          timezone: 'auto',
-          historical_years: 10,
-          climatology_window_days: 3,
-          scenario_percentiles: [10, 50, 75, 90],
+          location_name: loc, start_date: startDate, end_date: endDate,
+          granularity:'daily', timezone:'auto', historical_years:10,
+          climatology_window_days:3, scenario_percentiles:[10,50,75,90],
         })
-      })
+      }),
+      fetch(`/api/humidity/series?location_name=${encodeURIComponent(loc)}&start_date=${humStart}&end_date=${humEnd}`)
+        .then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
 
-    if (!fcRes.ok) {
-      const e = await fcRes.json();
-      throw new Error('Forecast: ' + (e.detail || JSON.stringify(e)));
-    }
-    if (!scRes.ok) {
-      const e = await scRes.json();
-      throw new Error('Scenarios: ' + (e.detail || JSON.stringify(e)));
-    }
+    if (!fcRes.ok) { const e = await fcRes.json(); throw new Error('Forecast: ' + (e.detail||JSON.stringify(e))); }
+    if (!scRes.ok) { const e = await scRes.json(); throw new Error('Scenarios: ' + (e.detail||JSON.stringify(e))); }
 
     const fc = await fcRes.json();
     const sc = await scRes.json();
 
-    renderProjection(fc, sc, days, startDate);
-
+    renderProjection(fc, sc, humRes, days, startDate);
   } catch(e) {
-    showError('Projection error: ' + e.message);
+    showError('Error: ' + e.message);
   } finally {
-    btn.innerHTML = 'Run projection';
-    btn.disabled = false;
+    btn.innerHTML = 'Run projection'; btn.disabled = false;
   }
 }
 
-function renderProjection(fc, sc, totalDays, startDate) {
-  // Build lookup maps
-  const forecastMap = {};
-  for (const r of fc.readings) forecastMap[r.date] = r.temperature_c;
+function renderProjection(fc, sc, hum, totalDays, startDate) {
+  // Build forecast map
+  const fcMap = {};
+  for (const r of fc.readings) fcMap[r.date] = r.temperature_c;
 
-  const scenarioMap = {};
-  const findScenario = (name) => sc.scenarios.find(s => s.name === name);
-  const baseline = findScenario('baseline_mean');
-  const p10s = findScenario('cool_p10');
-  const p50s = findScenario('median_p50');
-  const p75s = findScenario('warm_p75');
-  const p90s = findScenario('hot_p90');
+  // Build scenario map
+  const scMap = {};
+  const find = name => sc.scenarios.find(s => s.name === name);
+  for (const r of (find('baseline_mean')?.readings||[])) scMap[r.date] = {baseline:r.temperature_c};
+  for (const r of (find('cool_p10')?.readings||[]))      { if(scMap[r.date]) scMap[r.date].p10=r.temperature_c; }
+  for (const r of (find('median_p50')?.readings||[]))    { if(scMap[r.date]) scMap[r.date].p50=r.temperature_c; }
+  for (const r of (find('warm_p75')?.readings||[]))      { if(scMap[r.date]) scMap[r.date].p75=r.temperature_c; }
+  for (const r of (find('hot_p90')?.readings||[]))       { if(scMap[r.date]) scMap[r.date].p90=r.temperature_c; }
 
-  for (const r of (baseline?.readings || [])) scenarioMap[r.date] = { baseline: r.temperature_c };
-  for (const r of (p10s?.readings || [])) { if (scenarioMap[r.date]) scenarioMap[r.date].p10 = r.temperature_c; }
-  for (const r of (p50s?.readings || [])) { if (scenarioMap[r.date]) scenarioMap[r.date].p50 = r.temperature_c; }
-  for (const r of (p75s?.readings || [])) { if (scenarioMap[r.date]) scenarioMap[r.date].p75 = r.temperature_c; }
-  for (const r of (p90s?.readings || [])) { if (scenarioMap[r.date]) scenarioMap[r.date].p90 = r.temperature_c; }
+  // Build humidity map — keyed by day-of-year offset so it aligns with projection days
+  // hum.readings are from last year; we shift them forward by ~1 year to align dates
+  const humByOffset = {};
+  if (hum?.readings) {
+    hum.readings.forEach((r, i) => { humByOffset[i] = r.humidity_pct; });
+  }
 
-  const reliableCount = fc.forecast_reliable_days; // 7
-  const forecastCount = fc.forecast_days;           // up to 16
+  const relCount = fc.forecast_reliable_days;
+  const fcCount  = fc.forecast_days;
 
-  // Build unified day-by-day rows
   const rows = [];
   for (let i = 0; i <= totalDays; i++) {
     const date = addDays(startDate, i);
-    const inForecast = i < forecastCount && forecastMap[date] !== undefined;
-    const sc_today = scenarioMap[date] || {};
-
-    // Central: use forecast if available, else climatology median
-    const central = inForecast ? forecastMap[date] : (sc_today.p50 ?? sc_today.baseline ?? null);
-
+    const inFc = i < fcCount && fcMap[date] !== undefined;
+    const sc_today = scMap[date] || {};
+    const central = inFc ? fcMap[date] : (sc_today.p50 ?? sc_today.baseline ?? null);
     rows.push({
-      date,
-      day: i,
-      source: i < reliableCount ? 'forecast' : i < forecastCount ? 'forecast_ext' : 'climatology',
-      central,
-      p10: sc_today.p10 ?? null,
-      p50: sc_today.p50 ?? null,
-      p75: sc_today.p75 ?? null,
-      p90: sc_today.p90 ?? null,
+      date, day:i,
+      source: i < relCount ? 'forecast' : i < fcCount ? 'forecast_ext' : 'climatology',
+      central, p10:sc_today.p10??null, p50:sc_today.p50??null, p75:sc_today.p75??null, p90:sc_today.p90??null,
+      humidity: humByOffset[i] ?? null,
     });
   }
 
-  // Store for percentile card
-  lastProjection = { rows, loc: sc.resolved_location };
+  lastProjection = { rows };
 
-  // Chart arrays
-  const labels    = rows.map(r => fmt(r.date));
-  const central   = rows.map(r => r.central);
-  const p10arr    = rows.map(r => r.p10);
-  const p50arr    = rows.map(r => r.p50);
-  const p90arr    = rows.map(r => r.p90);
+  const labels  = rows.map(r => fmt(r.date));
+  const central = rows.map(r => r.central);
+  const p10     = rows.map(r => r.p10);
+  const p50     = rows.map(r => r.p50);
+  const p90     = rows.map(r => r.p90);
+  const humArr  = rows.map(r => r.humidity);
 
-  buildChart(labels, central, p10arr, p50arr, p90arr, forecastCount, reliableCount);
+  buildTempChart(labels, central, p10, p50, p90, fcCount, relCount);
 
-  // Subtitle
-  const locName = sc.resolved_location.name +
-    (sc.resolved_location.country ? ', ' + sc.resolved_location.country : '');
-  document.getElementById('chartSubtitle').textContent =
-    `${locName} · Today → Day ${totalDays} · Forecast + 10-year climatology blend`;
-
-  // Horizon card
+  const locName = sc.resolved_location.name + (sc.resolved_location.country ? ', ' + sc.resolved_location.country : '');
+  document.getElementById('chartSubtitle').textContent = `${locName} · Today → Day ${totalDays} · Forecast + 10-year climatology`;
   document.getElementById('horizonVal').textContent = `${totalDays} days`;
-  document.getElementById('horizonSub').textContent =
-    `${startDate} → ${addDays(startDate, totalDays)}`;
+  document.getElementById('horizonSub').textContent = `${startDate} → ${addDays(startDate, totalDays)}`;
+  document.getElementById('transitionText').textContent =
+    `Days 0–${relCount-1}: actual forecast  |  Days ${relCount}–${fcCount-1}: extended forecast  |  Days ${fcCount}+: 10-year climatology (P10–P90)`;
   document.getElementById('currentRow').style.display = 'flex';
 
-  // Transition note
-  document.getElementById('transitionText').textContent =
-    `Days 0–${reliableCount - 1}: actual meteorological forecast  |  ` +
-    `Days ${reliableCount}–${forecastCount - 1}: extended forecast (lower accuracy)  |  ` +
-    `Days ${forecastCount}+: 10-year climatology percentile band (P10–P90)`;
-
-  // Percentile card update if current temp is known
-  const currentTempText = document.getElementById('currentTempVal').textContent;
-  if (currentTempText !== '—') {
-    const tc = parseFloat(currentTempText);
-    if (!isNaN(tc)) updatePercentileCard(tc, lastProjection);
+  // Humidity chart
+  const hasHum = humArr.some(v => v !== null);
+  if (hasHum) {
+    document.getElementById('humPanel').style.display = 'block';
+    document.getElementById('humSubtitle').textContent =
+      `${locName} · Projected from same-period prior year archive`;
+    buildHumChart(labels, humArr, true);
   }
 
-  // Render table
-  renderTable(rows, forecastCount, reliableCount);
+  // Percentile card
+  const currentTempText = document.getElementById('currentTempVal').textContent;
+  if (currentTempText !== '—') { const tc = parseFloat(currentTempText); if(!isNaN(tc)) updatePercentileCard(tc, lastProjection); }
+
+  renderTable(rows, fcCount, relCount);
 }
 
-function renderTable(rows, forecastCount, reliableCount) {
+function renderTable(rows, fcCount, relCount) {
   const tbody = document.getElementById('tableBody');
-  const table = document.getElementById('dataTable');
-  const empty = document.getElementById('tableEmpty');
-  const info  = document.getElementById('tableInfo');
-
   tbody.innerHTML = '';
   for (const r of rows) {
     const srcLabel = r.source === 'forecast'
-      ? '<span class="td-source source-forecast">Forecast</span>'
+      ? '<span class="source-forecast">Forecast</span>'
       : r.source === 'forecast_ext'
-      ? '<span class="td-source source-forecast" style="opacity:0.7">Forecast (ext)</span>'
-      : '<span class="td-source source-climate">Climatology</span>';
-
+      ? '<span class="source-forecast" style="opacity:0.7">Forecast (ext)</span>'
+      : '<span class="source-climate">Climatology</span>';
+    const hStyle = r.humidity !== null && r.humidity >= 70 ? 'color:#7c3aed;font-weight:600' : '';
+    const hText  = r.humidity !== null ? `<span style="${hStyle}">${r.humidity}%${r.humidity>=70?' ⚠':''}</span>` : '—';
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${r.date}</td>
-      <td>${srcLabel}</td>
-      <td><strong>${r.central !== null ? r.central.toFixed(1) : '—'}</strong></td>
-      <td style="color:#2563eb">${r.p10 !== null ? r.p10.toFixed(1) : '—'}</td>
-      <td>${r.p50 !== null ? r.p50.toFixed(1) : '—'}</td>
-      <td style="color:#d97706">${r.p75 !== null ? r.p75.toFixed(1) : '—'}</td>
-      <td style="color:#dc2626">${r.p90 !== null ? r.p90.toFixed(1) : '—'}</td>
-    `;
+      <td>${r.date}</td><td>${srcLabel}</td>
+      <td><strong>${r.central!==null?r.central.toFixed(1):'—'}</strong></td>
+      <td>${hText}</td>
+      <td style="color:#2563eb">${r.p10!==null?r.p10.toFixed(1):'—'}</td>
+      <td>${r.p50!==null?r.p50.toFixed(1):'—'}</td>
+      <td style="color:#d97706">${r.p75!==null?r.p75.toFixed(1):'—'}</td>
+      <td style="color:#dc2626">${r.p90!==null?r.p90.toFixed(1):'—'}</td>`;
     tbody.appendChild(tr);
   }
-
-  table.style.display = 'table';
-  empty.style.display = 'none';
-  info.textContent = `${rows.length} days · ${reliableCount} forecast (reliable) · ${forecastCount - reliableCount} extended · ${rows.length - forecastCount} climatology`;
+  document.getElementById('dataTable').style.display = 'table';
+  document.getElementById('tableEmpty').style.display = 'none';
+  document.getElementById('tableInfo').textContent =
+    `${rows.length} days · ${relCount} forecast · ${fcCount-relCount} extended · ${rows.length-fcCount} climatology`;
 }
 </script>
 </body>
