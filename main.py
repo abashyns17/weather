@@ -26,6 +26,76 @@ OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 OPEN_METEO_GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 MIN_ARCHIVE_YEAR = 1940
 
+COUNTRY_TO_ZONE: dict[str, str] = {
+    "United Arab Emirates": "AE",
+    "Singapore": "SG",
+    "Poland": "PL",
+    "Germany": "DE",
+    "France": "FR",
+    "United Kingdom": "GB",
+    "Norway": "NO",
+    "Ukraine": "UA",
+    "United States": "US",
+    "Thailand": "TH",
+    "Sweden": "SE",
+    "Finland": "FI",
+    "Denmark": "DK",
+    "Netherlands": "NL",
+    "Belgium": "BE",
+    "Austria": "AT",
+    "Switzerland": "CH",
+    "Italy": "IT",
+    "Spain": "ES",
+    "Portugal": "PT",
+    "Ireland": "IE",
+    "Czech Republic": "CZ",
+    "Czechia": "CZ",
+    "Slovakia": "SK",
+    "Hungary": "HU",
+    "Romania": "RO",
+    "Bulgaria": "BG",
+    "Greece": "GR",
+    "Croatia": "HR",
+    "Slovenia": "SI",
+    "Estonia": "EE",
+    "Latvia": "LV",
+    "Lithuania": "LT",
+    "Luxembourg": "LU",
+    "Serbia": "RS",
+    "Japan": "JP",
+    "South Korea": "KR",
+    "Australia": "AU",
+    "Canada": "CA",
+    "Brazil": "BR",
+    "India": "IN",
+    "China": "CN",
+    "Russia": "RU",
+    "Turkey": "TR",
+    "Saudi Arabia": "SA",
+    "Qatar": "QA",
+    "Kuwait": "KW",
+    "Bahrain": "BH",
+    "Israel": "IL",
+    "South Africa": "ZA",
+    "Nigeria": "NG",
+    "Egypt": "EG",
+    "Morocco": "MA",
+}
+
+_ELECTRICITY_RATES: dict = {}
+
+
+def _load_electricity_rates() -> dict:
+    global _ELECTRICITY_RATES
+    rates_path = Path(__file__).parent / "data" / "electricity.json"
+    if rates_path.exists():
+        with open(rates_path, encoding="utf-8") as f:
+            _ELECTRICITY_RATES = json.load(f).get("zones", {})
+    return _ELECTRICITY_RATES
+
+
+_load_electricity_rates()
+
 
 class BaseLocationConfig(BaseModel):
     start_date: date = Field(..., description="Requested start date in YYYY-MM-DD format")
@@ -1211,6 +1281,14 @@ class HumidityScenarioResponse(BaseModel):
     scenarios: list[HumidityScenarioSeries]
 
 
+class ElectricityRatesResponse(BaseModel):
+    zone: str
+    country: Optional[str] = None
+    rate_eur_mwh: float
+    carbon_gco2_kwh: int
+    source: str = "static"
+
+
 async def fetch_humidity_scenario_curves(config: AppConfig) -> HumidityScenarioResponse:
     """Build percentile-based humidity scenario curves using the same
     climatology methodology as fetch_scenario_curves for temperature.
@@ -1354,6 +1432,37 @@ async def get_humidity_scenarios(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return await fetch_humidity_scenario_curves(config)
+
+
+@app.get("/api/electricity/rates", response_model=ElectricityRatesResponse)
+async def get_electricity_rates(
+    location_name: Optional[str] = Query(default=None),
+    latitude: Optional[float] = Query(default=None),
+    longitude: Optional[float] = Query(default=None),
+) -> ElectricityRatesResponse:
+    try:
+        config = CurrentLocationConfig(
+            location_name=location_name,
+            latitude=latitude,
+            longitude=longitude,
+        )
+        resolved = await resolve_location(config)
+        country = resolved.country or ""
+    except Exception:
+        country = ""
+
+    zone = COUNTRY_TO_ZONE.get(country, "DEFAULT")
+
+    rates = _ELECTRICITY_RATES.get(zone) or _ELECTRICITY_RATES.get("US", {})
+    if not rates:
+        rates = {"rate_eur_mwh": 100.0, "carbon_gco2_kwh": 400}
+
+    return ElectricityRatesResponse(
+        zone=zone,
+        country=country,
+        rate_eur_mwh=rates["rate_eur_mwh"],
+        carbon_gco2_kwh=rates["carbon_gco2_kwh"],
+    )
 
 
 if __name__ == "__main__":
